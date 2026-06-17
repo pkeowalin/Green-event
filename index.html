@@ -1,0 +1,956 @@
+import React, { useState, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Leaf, Sparkles, RotateCcw, Share2, Info, ChevronRight, Award, Trash2, ShieldAlert, Heart, Activity, CheckCircle, BarChart2, Plus, Sliders } from "lucide-react";
+
+// ==========================================
+// 1. STYLES & THEMING INJECTION
+// ==========================================
+const injectCustomStyles = () => {
+  if (typeof document !== "undefined") {
+    let style = document.getElementById("green-quiz-theme");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "green-quiz-theme";
+      style.innerHTML = `
+        @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
+        :root {
+          --background: 130 35% 98%;
+          --foreground: 220 25% 12%;
+          --card: 0 0% 100%;
+          --card-foreground: 220 25% 12%;
+          --popover: 0 0% 100%;
+          --popover-foreground: 220 25% 12%;
+          --primary: 142 76% 36%;
+          --primary-foreground: 355 100% 98%;
+          --secondary: 130 20% 94%;
+          --secondary-foreground: 130 40% 20%;
+          --muted: 130 10% 94%;
+          --muted-foreground: 130 15% 42%;
+          --accent: 142 70% 95%;
+          --accent-foreground: 142 76% 25%;
+          --destructive: 0 84% 60%;
+          --destructive-foreground: 0 0% 98%;
+          --border: 130 15% 89%;
+          --input: 130 15% 89%;
+          --ring: 142 76% 36%;
+          --radius: 1.25rem;
+        }
+        body {
+          font-family: 'Anuphan', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          background-color: rgb(244, 249, 245);
+        }
+        .font-heading {
+          font-family: 'Anuphan', sans-serif;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }
+};
+
+// Utility function to merge classnames
+const cn = (...classes) => classes.filter(Boolean).join(" ");
+
+// ==========================================
+// 2. GREEN EVENT DATA (mocked and refined)
+// ==========================================
+const organizerQuestions = [
+  {
+    id: "o1",
+    category: "อาหารและเครื่องดื่ม (Food & Catering)",
+    emoji: "🍱",
+    question: "การเลือกจัดเลี้ยงอาหารและเครื่องดื่มในงานอีเวนต์",
+    options: [
+      { emoji: "🌱", text: "อาหารมังสวิรัติ/วีแกนทั้งหมดจากวัตถุดิท้องถิ่น", co2: 12.5 },
+      { emoji: "🥗", text: "อาหารทั่วไปแต่เพิ่มสัดส่วนผัก พร้อมป้ายระบุคาร์บอนฟุตพริ้นท์", co2: 6.0 },
+      { emoji: "🥩", text: "อาหารบุฟเฟต์ทั่วไป ไม่มีการคัดสรรแหล่งวัตถุดิบเป็นพิเศษ", co2: 0.0 }
+    ]
+  },
+  {
+    id: "o2",
+    category: "วัสดุและการตกแต่ง (Materials & Decor)",
+    emoji: "🪵",
+    question: "อุปกรณ์ตกแต่งสถานที่และของที่ระลึกภายในงาน",
+    options: [
+      { emoji: "♻️", text: "ใช้วัสดุธรรมชาติ/รีไซเคิล 100% หรือของที่ระลึกในรูปแบบดิจิทัล", co2: 8.0 },
+      { emoji: "🎨", text: "เน้นการเช่าอุปกรณ์ ตกแต่งแบบมินิมอลเพื่อลดขยะหลังจบงาน", co2: 4.5 },
+      { emoji: "🎈", text: "สั่งผลิตฉากเวทีและของแจกพลาสติกชุดใหม่ทั้งหมดเพื่อธีมงาน", co2: 0.0 }
+    ]
+  },
+  {
+    id: "o3",
+    category: "พลังงานในงาน (Energy & Utilities)",
+    emoji: "⚡",
+    question: "การบริหารจัดการพลังงานและระบบปรับอากาศภายในงาน",
+    options: [
+      { emoji: "☀️", text: "เลือกสถานที่จัดงานที่ใช้พลังงานหมุนเวียน (โซลาร์เซลล์ / พลังงานสะอาด)", co2: 15.0 },
+      { emoji: "💡", text: "ปรับระดับอุณหภูมิแอร์อย่างเหมาะสม (25-26°C) ร่วมกับใช้หลอดไฟ LED ทั้งหมด", co2: 7.0 },
+      { emoji: "🔌", text: "ใช้งานพลังงานไฟฟ้ากระแสหลักปกติ ไม่จำกัดการเปิดอุปกรณ์", co2: 0.0 }
+    ]
+  },
+  {
+    id: "o4",
+    category: "การจัดการขยะ (Waste Management)",
+    emoji: "🗑️",
+    question: "ระบบถังขยะและการรณรงค์คัดแยกภายในบริเวณงาน",
+    options: [
+      { emoji: "♻️", text: "จัดจุดแยกขยะละเอียด 4 ประเภท พร้อมเจ้าหน้าที่แนะนำวิธีแยก", co2: 10.0 },
+      { emoji: "🪣", text: "มีถังแยกประเภทพื้นฐานขยะเปียก-ขยะแห้ง ทั่วทุกจุดอย่างชัดเจน", co2: 4.0 },
+      { emoji: "🚮", text: "วางถังขยะรวมจุดเดียว ไม่มีการรณรงค์การแยกขยะเป็นพิเศษ", co2: 0.0 }
+    ]
+  },
+  {
+    id: "o5",
+    category: "สถานที่จัดงาน (Venue Selection)",
+    emoji: "📍",
+    question: "การเลือกทำเลและสไตล์การจัดกิจกรรม",
+    options: [
+      { emoji: "🚇", text: "ติดแนวรถไฟฟ้า BTS/MRT หรือใช้ระบบการเข้างานแบบไฮบริดออนไลน์", co2: 14.0 },
+      { emoji: "🏢", text: "สถานที่ใจกลางเมืองที่มีที่จอดรถจำกัด แต่เดินรถสาธารณะมาสะดวก", co2: 6.0 },
+      { emoji: "🚗", text: "สถานที่แถบชานเมืองหรือรีสอร์ต เดินทางด้วยรถยนต์ส่วนตัวเท่านั้น", co2: 0.0 }
+    ]
+  }
+];
+
+const attendeeQuestions = [
+  {
+    id: "a1",
+    category: "การเดินทาง (Transportation)",
+    emoji: "🚇",
+    question: "วิธีการเดินทางหลักของคุณเพื่อมาร่วมงานในวันนี้",
+    options: [
+      { emoji: "🚲", text: "เดิน ปั่นจักรยาน หรือเดินทางด้วยระบบรถไฟฟ้า/รถสาธารณะ", co2: 10.0 },
+      { emoji: "🚌", text: "โดยสารรถประจำทาง หรือคาร์พูลแชร์รถร่วมกับผู้ร่วมงานท่านอื่น", co2: 4.5 },
+      { emoji: "🚗", text: "ขับรถยนต์ส่วนตัวเดินทางคนเดียวมาที่งาน", co2: 0.0 }
+    ]
+  },
+  {
+    id: "a2",
+    category: "ขยะพลาสติกพกพา (Reusable Items)",
+    emoji: "🥤",
+    question: "การเตรียมตัวก่อนเดินทางมาเข้าร่วมงาน",
+    options: [
+      { emoji: "🥛", text: "พกขวดน้ำ กระติกส่วนตัว และถุงผ้ามาเองจากบ้าน", co2: 6.0 },
+      { emoji: "🥤", text: "ใช้แก้ว/ถุงกระดาษที่ย่อยสลายได้ หรือรับประทานที่จุดบริการ", co2: 2.0 },
+      { emoji: "🧴", text: "รับขวดน้ำพลาสติกแบบใช้ครั้งเดียวทิ้งที่ผู้จัดงานแจกให้", co2: 0.0 }
+    ]
+  },
+  {
+    id: "a3",
+    category: "ขยะเศษอาหาร (Food Waste)",
+    emoji: "🍛",
+    question: "การรับประทานอาหารว่างและอาหารกลางวันของคุณภายในงาน",
+    options: [
+      { emoji: "🍽️", text: "รับประทานในปริมาณที่พอเหมาะ ทานหมดเกลี้ยง จานสะอาด 100%", co2: 7.0 },
+      { emoji: "🥡", text: "ทานเหลือเล็กน้อยแต่คัดแยกเศษอาหารลงถังขยะเปียกเพื่อไปทำปุ๋ย", co2: 3.0 },
+      { emoji: "🗑️", text: "ทานเหลือค่อนข้างมาก และทิ้งรวมลงถังขยะทั่วไปปนกับภาชนะอื่น", co2: 0.0 }
+    ]
+  },
+  {
+    id: "a4",
+    category: "เอกสารและของรางวัล (Eco-Document & Swag)",
+    emoji: "📄",
+    question: "การรับเอกสาร สูจิบัตร แผ่นพับ และของที่ระลึกภายในงาน",
+    options: [
+      { emoji: "📱", text: "ปฏิเสธเอกสารกระดาษทั้งหมด เลือกสแกนรับข้อมูลผ่าน QR Code", co2: 5.0 },
+      { emoji: "🗒️", text: "รับเอกสารเฉพาะส่วนที่จำเป็นมากๆ และช่วยส่งคืนเพื่อนำมารีไซเคิล", co2: 2.0 },
+      { emoji: "🛍️", text: "รับแผ่นพับสติกเกอร์ ถุงผ้า และของแจกฟรีทุกอย่างที่งานเตรียมไว้ให้", co2: 0.0 }
+    ]
+  },
+  {
+    id: "a5",
+    category: "การแต่งตัวและเสื้อผ้า (Eco-Fashion)",
+    emoji: "👕",
+    question: "ชุดและเครื่องแต่งกายที่คุณเลือกสวมใส่มาในวันนี้",
+    options: [
+      { emoji: "👔", text: "สวมเสื้อผ้าที่มีอยู่แล้วในตู้ หรือชุดเสื้อผ้ารีไซเคิล/มือสองสไตล์มินิมอล", co2: 8.0 },
+      { emoji: "👕", text: "สวมเสื้อยืดคอตตอนทางการของงานที่ได้รับแจกจากการลงทะเบียน", co2: 3.0 },
+      { emoji: "🛍️", text: "ซื้อชุดสูทหรือชุดเดรสใหม่ยกชุด เพื่อให้เป๊ะตามธีมสีของงานโดยเฉพาะ", co2: 0.0 }
+    ]
+  }
+];
+
+// สลับคำถามผู้จัดและผู้ร่วมงานสลับกันอย่างละ 5 ข้อ เป็น 10 ข้อพอดี
+const allQuestions = organizerQuestions.flatMap((q, i) =>
+  attendeeQuestions[i] ? [q, attendeeQuestions[i]] : [q]
+);
+
+const maxOrganizerCO2 = organizerQuestions.reduce((sum, q) => sum + Math.max(...q.options.map(o => o.co2)), 0);
+const maxAttendeeCO2 = attendeeQuestions.reduce((sum, q) => sum + Math.max(...q.options.map(o => o.co2)), 0);
+
+const getLevel = (totalCO2, maxCO2) => {
+  const pct = totalCO2 / maxCO2;
+  if (pct < 0.4) {
+    return {
+      label: "🌱 ต้นกล้าหัดรักษ์โลก (Green Novice)",
+      color: "from-amber-400 to-emerald-500",
+      bg: "bg-amber-50/90 border border-amber-100",
+      textColor: "text-amber-800",
+      desc: "คุณเริ่มต้นใส่ใจโลกแล้วนะ! อีกนิดเดียวหากปรับแผนการจัดงานและการร่วมงานอีกหน่อย คาร์บอนจะลดฮวบเลย!"
+    };
+  } else if (pct < 0.75) {
+    return {
+      label: "🌿 นักสู้ลดคาร์บอน (Carbon Fighter)",
+      color: "from-emerald-400 to-teal-500",
+      bg: "bg-emerald-50/80 border border-emerald-100",
+      textColor: "text-emerald-800",
+      desc: "ยอดเยี่ยมมาก! คุณช่วยเซฟโลกได้อย่างมีนัยสำคัญ มีแนวคิดเป็นมิตรต่อสิ่งแวดล้อมที่นำไปใช้ประโยชน์จริงได้"
+    };
+  } else {
+    return {
+      label: "🌳 ผู้พิทักษ์ธรรมชาติ (Eco Warrior)",
+      color: "from-green-500 to-emerald-600",
+      bg: "bg-green-50/90 border border-green-100",
+      textColor: "text-green-800",
+      desc: "ระดับตำนาน! ตัวจริงเรื่อง Green Event คุณทำคะแนนรักษ์โลกได้สูงมาก ช่วยเป็นแรงบันดาลใจให้คนรอบข้างต่อนะ!"
+    };
+  }
+};
+
+const getComparisons = (totalCO2) => {
+  const treesDays = Math.round(totalCO2 / 0.03); // สมมติว่าต้นไม้ 1 ต้นดูดซับ CO2 ได้ 0.03 kg/วัน
+  const phoneCharges = Math.round(totalCO2 / 0.008); // สมมติว่าชาร์จโทรศัพท์ 1 ครั้งปล่อย CO2 ~0.008 kg
+  const carKm = Math.round(totalCO2 / 0.12); // รถยนต์น้ำมันทั่วไปปล่อย CO2 ~0.12 kg/km
+  return [
+    { emoji: "🌳", label: `ปลูกต้นไม้ใหญ่ช่วยดูดซับคาร์บอนเป็นเวลา ${treesDays} วัน`, sub: "เทียบเท่าผลลัพธ์ของป่าสีเขียวทำงานอย่างตั้งใจ" },
+    { emoji: "📱", label: `ช่วยทดแทนการชาร์จสมาร์ตโฟนได้ถึง ${phoneCharges.toLocaleString()} ครั้ง`, sub: "พลังงานมหาศาลที่ถูกกู้คืนกลับมา" },
+    { emoji: "🚗", label: `ลดระยะการขับขี่รถยนต์ส่วนตัวลงถึง ${carKm} กิโลเมตร`, sub: "ประหยัดเชื้อเพลิงและไอเสียบนท้องถนน" }
+  ];
+};
+
+// ==========================================
+// 3. REUSABLE UI COMPONENTS
+// ==========================================
+const Button = React.forwardRef(({ className, variant = "default", size = "default", ...props }, ref) => {
+  const baseStyles = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-semibold font-heading transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]";
+
+  const variants = {
+    default: "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-lg shadow-green-600/20 hover:shadow-xl hover:shadow-green-600/30",
+    destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+    outline: "border-2 border-emerald-500/20 bg-card hover:bg-emerald-50/50 text-emerald-700",
+    secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+    ghost: "hover:bg-accent hover:text-accent-foreground",
+    link: "text-primary underline-offset-4 hover:underline",
+  };
+
+  const sizes = {
+    default: "h-11 px-5 py-2.5",
+    sm: "h-9 rounded-xl px-3 text-xs",
+    lg: "h-14 rounded-2xl px-8 text-base",
+    icon: "h-11 w-11",
+  };
+
+  return (
+    <button
+      ref={ref}
+      className={cn(baseStyles, variants[variant], sizes[size], className)}
+      {...props}
+    />
+  );
+});
+Button.displayName = "Button";
+
+// Toast Alert (เพื่อหลีกเลี่ยงการใช้ alert)
+const Toast = ({ message, type = "success", onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 50, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.95 }}
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900/95 text-white py-3 px-6 rounded-2xl shadow-xl border border-white/10 backdrop-blur-md"
+    >
+      <span className="text-xl">✨</span>
+      <span className="text-sm font-medium font-heading">{message}</span>
+    </motion.div>
+  );
+};
+
+// ==========================================
+// 4. SCREEN: HOME
+// ==========================================
+function HomeScreen({ onStart }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="flex flex-col items-center justify-center min-h-[85vh] px-4 text-center relative"
+    >
+      {/* Floating leaves */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        {["🍃", "🌿", "🌱", "☘️", "🍀", "🌾"].map((leaf, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-3xl opacity-30 select-none"
+            style={{ left: `${10 + i * 15}%` }}
+            initial={{ y: -60, opacity: 0.3 }}
+            animate={{ y: "110vh", opacity: [0.2, 0.5, 0.2] }}
+            transition={{
+              duration: 10 + i * 1.5,
+              repeat: Infinity,
+              delay: i * 1.8,
+              ease: "linear",
+            }}
+          >
+            {leaf}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Globe icon */}
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+        className="relative mb-8 z-10"
+      >
+        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-2xl shadow-green-300/40">
+          <span className="text-6xl animate-bounce">🌍</span>
+        </div>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute -inset-3 rounded-full border-2 border-dashed border-primary/30"
+        />
+      </motion.div>
+
+      {/* Title */}
+      <div className="z-10 max-w-xl">
+        <motion.h1
+          initial={{ y: 30, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="text-4xl md:text-5xl font-heading font-black bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 bg-clip-text text-transparent mb-2"
+        >
+          Green Event Quiz
+        </motion.h1>
+
+        <motion.p
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="text-lg md:text-xl font-heading font-bold text-slate-800 mb-4"
+        >
+          วัดระดับ Green ของคุณในงาน Event 🌿
+        </motion.p>
+
+        <motion.p
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="text-slate-500 max-w-md mx-auto mb-8 leading-relaxed"
+        >
+          ตอบคำถาม 10 ข้อ เกี่ยวกับการจัดงานและการเข้าร่วมงานอย่างยั่งยืน แล้วดูว่าคุณช่วยลดการปล่อยคาร์บอนไดออกไซด์ (CO₂) ได้มากน้อยแค่ไหนกันแน่!
+        </motion.p>
+      </div>
+
+      {/* Stats */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.7 }}
+        className="flex gap-6 mb-10 text-center z-10 bg-white/70 backdrop-blur-md px-6 py-4 rounded-2xl border border-green-100"
+      >
+        {[
+          { emoji: "❓", label: "10 คำถาม" },
+          { emoji: "⏱️", label: "~2 นาที" },
+          { emoji: "🌱", label: "คำนวณ CO₂ จริง" },
+        ].map((s, i) => (
+          <div key={i} className="flex flex-col items-center gap-1">
+            <span className="text-2xl">{s.emoji}</span>
+            <span className="text-xs font-heading text-slate-500 font-semibold whitespace-nowrap">
+              {s.label}
+            </span>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* CTA Button */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.85 }}
+        className="z-10"
+      >
+        <Button onClick={onStart} size="lg">
+          <Sparkles className="w-5 h-5 mr-2" />
+          เริ่มทำแบบทดสอบ
+        </Button>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.1 }}
+        className="mt-10 flex items-center gap-2 text-xs text-slate-400 z-10"
+      >
+        <Leaf className="w-3.5 h-3.5 text-emerald-500" />
+        <span>ไม่มีต้นไม้ถูกทำร้ายในการทำแบบทดสอบนี้ 😄</span>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 5. SCREEN: QUESTION CARD
+// ==========================================
+function EventQuestionCard({ question, questionIndex, totalQuestions, onAnswer }) {
+  return (
+    <motion.div
+      key={question.id}
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -80 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className="w-full max-w-xl mx-auto px-4 py-6"
+    >
+      {/* Progress & Counter */}
+      <div className="flex items-center justify-end mb-4">
+        <span className="text-xs font-heading font-bold text-slate-400">
+          คำถามที่ {questionIndex + 1} / {totalQuestions}
+        </span>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="mb-8">
+        <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full"
+            initial={{ width: `${(questionIndex / totalQuestions) * 100}%` }}
+            animate={{ width: `${((questionIndex + 1) / totalQuestions) * 100}%` }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+          />
+        </div>
+      </div>
+
+      {/* Question Main block */}
+      <div className="bg-white rounded-3xl p-6 md:p-8 border border-green-100 shadow-xl shadow-green-800/[0.03] text-center mb-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-3 opacity-5 select-none text-9xl pointer-events-none">
+          🌿
+        </div>
+
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 400, delay: 0.1 }}
+          className="text-6xl mb-4"
+        >
+          {question.emoji}
+        </motion.div>
+
+        <p className="text-xs font-heading text-emerald-600 font-bold uppercase tracking-widest mb-2">
+          {question.category}
+        </p>
+        <h2 className="text-xl md:text-2xl font-heading font-bold text-slate-800 leading-relaxed">
+          {question.question}
+        </h2>
+      </div>
+
+      {/* Options List (Removed CO₂ numbers/badges entirely to avoid bias) */}
+      <div className="space-y-3">
+        {question.options.map((option, idx) => (
+          <motion.button
+            key={idx}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 + idx * 0.08 }}
+            onClick={() => onAnswer(option.co2)}
+            className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-emerald-500/50 hover:bg-emerald-50/20 shadow-sm transition-all duration-300 group active:scale-[0.99] flex items-center gap-3.5"
+          >
+            <span className="text-3xl bg-slate-50 p-2 rounded-xl group-hover:scale-110 group-hover:bg-emerald-50 transition-all duration-300 select-none flex-shrink-0">
+              {option.emoji}
+            </span>
+            <span className="text-sm md:text-base font-medium text-slate-700 group-hover:text-emerald-900 transition-colors">
+              {option.text}
+            </span>
+          </motion.button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 6. COMPONENT: INTERACTIVE GREEN SIMULATOR
+// ==========================================
+function CarbonSimulator() {
+  const [selections, setSelections] = useState({});
+
+  useEffect(() => {
+    // กำหนดค่าเริ่มต้นเป็นตัวเลือกแรกของแต่ละคำถาม (ค่า Carbon สูงสุดเพื่อความสวยงามในตอนเริ่ม)
+    const initial = {};
+    organizerQuestions.forEach(q => {
+      initial[q.id] = q.options[0].co2;
+    });
+    attendeeQuestions.forEach(q => {
+      initial[q.id] = q.options[0].co2;
+    });
+    setSelections(initial);
+  }, []);
+
+  const handleSelectOption = (qId, co2Value) => {
+    setSelections(prev => ({
+      ...prev,
+      [qId]: co2Value
+    }));
+  };
+
+  const currentOrgCO2 = organizerQuestions.reduce((sum, q) => sum + (selections[q.id] || 0), 0);
+  const currentAttCO2 = attendeeQuestions.reduce((sum, q) => sum + (selections[q.id] || 0), 0);
+  const currentTotal = currentOrgCO2 + currentAttCO2;
+  const maxTotal = maxOrganizerCO2 + maxAttendeeCO2;
+  const simLevel = getLevel(currentTotal, maxTotal);
+  const simPct = Math.round((currentTotal / maxTotal) * 100);
+
+  return (
+    <div className="bg-white rounded-3xl p-6 border border-emerald-100 shadow-xl space-y-6">
+      {/* Simulation Header Header */}
+      <div className="text-center space-y-2">
+        <h3 className="text-xl font-bold font-heading text-slate-800 flex items-center justify-center gap-2">
+          <Sliders className="w-5 h-5 text-emerald-500" />
+          Interactive Event Simulator
+        </h3>
+        <p className="text-sm text-slate-500">
+          ทดลองปรับแต่งแนวทางการจัดงานและพฤติกรรมผู้เข้าร่วมเพื่อสแกนหาจุดลดคาร์บอนสูงสุดร่วมกัน!
+        </p>
+      </div>
+
+      {/* Simulator Meter Board */}
+      <div className={cn("p-5 rounded-2xl text-center space-y-4", simLevel.bg)}>
+        <div>
+          <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">คาร์บอนที่ลดได้จริง</span>
+          <div className="flex items-baseline justify-center gap-1.5 mt-1">
+            <span className={cn("text-5xl font-black font-heading", simLevel.textColor)}>
+              {currentTotal.toFixed(1)}
+            </span>
+            <span className={cn("text-xl font-bold", simLevel.textColor)}>kg CO₂</span>
+          </div>
+          <span className="text-xs text-slate-400 block mt-1">เป้าหมายสูงสุดคือ {maxTotal.toFixed(1)} kg</span>
+        </div>
+
+        {/* Dynamic Slider-like progress */}
+        <div className="h-3 bg-white/60 rounded-full overflow-hidden relative">
+          <motion.div
+            className={`h-full bg-gradient-to-r ${simLevel.color} rounded-full`}
+            animate={{ width: `${simPct}%` }}
+            transition={{ type: "spring", stiffness: 100, damping: 20 }}
+          />
+        </div>
+        <div className="flex justify-between items-center text-xs font-bold px-1">
+          <span className={simLevel.textColor}>{simPct}% ของศักยภาพสูงสุด</span>
+          <span className={cn("px-2 py-0.5 rounded-md text-[10px] uppercase font-bold text-white bg-gradient-to-r", simLevel.color)}>
+            {simLevel.label.split(" ")[0]}
+          </span>
+        </div>
+      </div>
+
+      {/* Category Toggles Accordions */}
+      <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
+        {/* Organizer Section */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-black text-emerald-800 uppercase tracking-widest flex items-center gap-1.5 border-b border-emerald-50 pb-1.5">
+            <span>🎪</span> มาตรการผู้จัดงาน (Organizer Measures)
+          </h4>
+          {organizerQuestions.map((q) => (
+            <div key={q.id} className="bg-slate-50 p-3.5 rounded-2xl space-y-2.5 border border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{q.emoji}</span>
+                <span className="text-sm font-bold text-slate-700">{q.category}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {q.options.map((opt, oIdx) => {
+                  const isSelected = selections[q.id] === opt.co2;
+                  return (
+                    <button
+                      key={oIdx}
+                      onClick={() => handleSelectOption(q.id, opt.co2)}
+                      className={cn(
+                        "p-2 rounded-xl text-center transition-all duration-200 border-2 text-[11px] flex flex-col items-center gap-1 justify-center min-h-[64px]",
+                        isSelected 
+                          ? "bg-emerald-600 text-white border-emerald-600 font-bold shadow-md shadow-emerald-600/10 scale-[1.03]" 
+                          : "bg-white border-slate-100 text-slate-600 hover:bg-slate-100/50"
+                      )}
+                    >
+                      <span className="text-base select-none">{opt.emoji}</span>
+                      <span className="line-clamp-1 leading-tight">{opt.text.split(" (")[0]}</span>
+                      <span className={cn("text-[10px] font-bold block", isSelected ? "text-emerald-100" : "text-emerald-600")}>
+                        {opt.co2 > 0 ? `-${opt.co2.toFixed(1)} kg` : "0.0 kg"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Attendee Section */}
+        <div className="space-y-3 pt-2">
+          <h4 className="text-xs font-black text-sky-800 uppercase tracking-widest flex items-center gap-1.5 border-b border-sky-50 pb-1.5">
+            <span>🙋</span> พฤติกรรมผู้ร่วมงาน (Attendee Actions)
+          </h4>
+          {attendeeQuestions.map((q) => (
+            <div key={q.id} className="bg-slate-50 p-3.5 rounded-2xl space-y-2.5 border border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{q.emoji}</span>
+                <span className="text-sm font-bold text-slate-700">{q.category}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {q.options.map((opt, oIdx) => {
+                  const isSelected = selections[q.id] === opt.co2;
+                  return (
+                    <button
+                      key={oIdx}
+                      onClick={() => handleSelectOption(q.id, opt.co2)}
+                      className={cn(
+                        "p-2 rounded-xl text-center transition-all duration-200 border-2 text-[11px] flex flex-col items-center gap-1 justify-center min-h-[64px]",
+                        isSelected 
+                          ? "bg-sky-600 text-white border-sky-600 font-bold shadow-md shadow-sky-600/10 scale-[1.03]" 
+                          : "bg-white border-slate-100 text-slate-600 hover:bg-slate-100/50"
+                      )}
+                    >
+                      <span className="text-base select-none">{opt.emoji}</span>
+                      <span className="line-clamp-1 leading-tight">{opt.text.split(" (")[0]}</span>
+                      <span className={cn("text-[10px] font-bold block", isSelected ? "text-sky-100" : "text-sky-600")}>
+                        {opt.co2 > 0 ? `-${opt.co2.toFixed(1)} kg` : "0.0 kg"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 7. SCREEN: RESULT & ANALYSIS
+// ==========================================
+function ResultScreen({ organizerCO2, attendeeCO2, role, onRestart, onShowToast }) {
+  const [activeTab, setActiveTab] = useState("summary"); // summary | simulator
+  
+  const totalCO2 = organizerCO2 + attendeeCO2;
+  const maxCO2 = maxOrganizerCO2 + maxAttendeeCO2;
+
+  const level = getLevel(totalCO2, maxCO2);
+  const comparisons = getComparisons(totalCO2);
+  const pct = Math.round((totalCO2 / maxCO2) * 100);
+
+  const handleShare = () => {
+    const text = `ฉันทำแบบทดสอบและช่วยลดคาร์บอน (CO₂) ได้ถึง ${totalCO2.toFixed(1)} kg! จากแบบทดสอบ Green Event 🌍\nระดับรักษ์โลกของฉัน: ${level.label}\n\nมาร่วมรักษ์โลกกันได้ที่ Green Event Quiz!`;
+    
+    // Fallback share logic to support iframe environments
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed"; 
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      
+      if (success) {
+        onShowToast("คัดลอกผลลัพธ์ลงในคลิปบอร์ดแล้ว! ส่งต่อให้เพื่อนๆ ได้เลย");
+      } else {
+        onShowToast("ไม่สามารถคัดลอกได้โดยอัตโนมัติ กรุณาลองใหม่อีกครั้ง");
+      }
+    } catch (err) {
+      onShowToast("เกิดข้อผิดพลาดในการคัดลอก");
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="w-full max-w-xl mx-auto px-4 py-4"
+    >
+      {/* Navigation tabs */}
+      <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
+        <button
+          onClick={() => setActiveTab("summary")}
+          className={cn(
+            "flex-1 py-3 text-sm font-heading font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5",
+            activeTab === "summary" ? "bg-white shadow-md text-emerald-800" : "text-slate-500 hover:text-slate-800"
+          )}
+        >
+          <Award className="w-4 h-4 text-emerald-500" />
+          สรุปคะแนนรักษ์โลก
+        </button>
+        <button
+          onClick={() => setActiveTab("simulator")}
+          className={cn(
+            "flex-1 py-3 text-sm font-heading font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5",
+            activeTab === "simulator" ? "bg-white shadow-md text-emerald-800" : "text-slate-500 hover:text-slate-800"
+          )}
+        >
+          <Sliders className="w-4 h-4 text-emerald-500" />
+          จำลองแผนคาร์บอน
+        </button>
+      </div>
+
+      <AnimatePresence mode="wait">
+        {activeTab === "summary" ? (
+          <motion.div
+            key="summary-tab"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="space-y-6"
+          >
+            {/* Level Badge */}
+            <motion.div
+              initial={{ scale: 0, rotate: -10 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+              className="text-center"
+            >
+              <div className={`inline-flex w-32 h-32 rounded-full bg-gradient-to-br ${level.color} items-center justify-center shadow-2xl mx-auto`}>
+                <span className="text-6xl">{level.label.split(" ")[0]}</span>
+              </div>
+              <motion.h2
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-2xl font-heading font-black text-slate-800 mt-4"
+              >
+                {level.label.slice(2)}
+              </motion.h2>
+              <p className="text-xs text-slate-400 mt-1">ระดับความเป็นมิตรต่อสิ่งแวดล้อมของคุณ</p>
+            </motion.div>
+
+            {/* Score Showcase Panel */}
+            <motion.div
+              initial={{ y: 25, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className={`${level.bg} rounded-3xl p-6 text-center shadow-lg relative`}
+            >
+              <p className="text-sm font-heading font-semibold text-slate-500 mb-1">คุณมีส่วนช่วยลดการปล่อยคาร์บอน CO₂ ได้สะสม</p>
+              <div className="flex items-end justify-center gap-2 mb-2">
+                <span className={`text-6xl font-heading font-black ${level.textColor}`}>
+                  {totalCO2.toFixed(1)}
+                </span>
+                <span className={`text-2xl font-heading font-bold ${level.textColor} mb-2`}>kg</span>
+              </div>
+              <p className="text-xs text-slate-400 mb-4">จากยอดคาร์บอนที่เป็นไปได้ทั้งหมด {maxCO2.toFixed(1)} kg</p>
+
+              {/* Progress bar */}
+              <div className="h-3.5 bg-white/70 rounded-full overflow-hidden mb-2 shadow-inner border border-slate-100">
+                <motion.div
+                  className={`h-full bg-gradient-to-r ${level.color} rounded-full`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 1.2, delay: 0.6, ease: "easeOut" }}
+                />
+              </div>
+              <p className={`text-sm font-heading font-bold ${level.textColor}`}>
+                {pct}% ของศักยภาพสูงสุดในแคมเปญสีเขียวนี้
+              </p>
+
+              {/* Insight Description */}
+              <div className="mt-4 pt-3 border-t border-slate-200/40 text-left">
+                <p className="text-xs leading-relaxed text-slate-600 font-medium">
+                  💡 <strong>ประเมินผล:</strong> {level.desc}
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Breakdown Grid */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="grid grid-cols-2 gap-4"
+            >
+              <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
+                <div className="text-3xl mb-1 select-none">🎪</div>
+                <p className="text-xs text-slate-400 font-heading font-bold mb-1">ฝั่งผู้จัดงาน</p>
+                <p className="text-2xl font-heading font-black text-emerald-600">{organizerCO2.toFixed(1)}</p>
+                <p className="text-[10px] text-slate-400">kg CO₂ ที่ประหยัดได้</p>
+              </div>
+              <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
+                <div className="text-3xl mb-1 select-none">🙋</div>
+                <p className="text-xs text-slate-400 font-heading font-bold mb-1">ฝั่งผู้ร่วมงาน</p>
+                <p className="text-2xl font-heading font-black text-teal-600">{attendeeCO2.toFixed(1)}</p>
+                <p className="text-[10px] text-slate-400">kg CO₂ ที่ประหยัดได้</p>
+              </div>
+            </motion.div>
+
+            {/* Comparisons Box */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm"
+            >
+              <h3 className="text-xs font-heading font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-emerald-500" />
+                เปรียบเทียบผลลัพธ์เชิงนิเวศน์ (Eco-Equivalent)
+              </h3>
+              <div className="space-y-4">
+                {comparisons.map((c, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.7 + i * 0.1 }}
+                    className="flex items-start gap-3.5"
+                  >
+                    <span className="text-3xl bg-slate-50 p-2 rounded-xl select-none">{c.emoji}</span>
+                    <div className="space-y-0.5">
+                      <p className="text-sm md:text-base font-heading font-bold text-slate-800 leading-snug">
+                        {c.label}
+                      </p>
+                      <p className="text-xs text-slate-400">{c.sub}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Control buttons */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              className="flex flex-col sm:flex-row gap-3 pt-2"
+            >
+              <Button onClick={handleShare} className="flex-1 py-4">
+                <Share2 className="w-5 h-5" />
+                แชร์และบอกต่อความรักษ์โลก
+              </Button>
+              <Button onClick={onRestart} variant="outline" className="flex-1 py-4">
+                <RotateCcw className="w-5 h-5" />
+                เริ่มคำนวณใหม่อีกครั้ง
+              </Button>
+            </motion.div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="simulator-tab"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+          >
+            <CarbonSimulator />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 8. PRIMARY APP ROOT (App)
+// ==========================================
+export default function App() {
+  const [stage, setStage] = useState("home"); // home | quiz | result
+  const [currentQ, setCurrentQ] = useState(0);
+  const [organizerCO2, setOrganizerCO2] = useState(0);
+  const [attendeeCO2, setAttendeeCO2] = useState(0);
+  const [toastMessage, setToastMessage] = useState("");
+
+  // การฝัง CSS และฟอนต์สำหรับแอปแบบ Dynamic ครั้งเดียวเมื่อเมานต์แอป
+  useEffect(() => {
+    injectCustomStyles();
+  }, []);
+
+  const handleAnswer = (co2) => {
+    const q = allQuestions[currentQ];
+    // ตรวจสอบว่าเป็นคำถามประเภทผู้จัด โดยเช็กจาก ID
+    const isOrganizerQ = organizerQuestions.some((oq) => oq.id === q.id);
+    
+    if (isOrganizerQ) {
+      setOrganizerCO2((prev) => prev + co2);
+    } else {
+      setAttendeeCO2((prev) => prev + co2);
+    }
+
+    if (currentQ + 1 < allQuestions.length) {
+      setCurrentQ(currentQ + 1);
+    } else {
+      setStage("result");
+    }
+  };
+
+  const handleRestart = () => {
+    setStage("home");
+    setCurrentQ(0);
+    setOrganizerCO2(0);
+    setAttendeeCO2(0);
+  };
+
+  const triggerToast = (msg) => {
+    setToastMessage(msg);
+  };
+
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-slate-50 text-slate-800 pb-16 pt-6">
+      {/* Background Soft Blobs */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[500px] bg-gradient-to-b from-emerald-500/[0.08] via-transparent to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-[350px] h-[350px] bg-gradient-to-tl from-emerald-400/[0.06] via-transparent to-transparent rounded-full blur-2xl" />
+      </div>
+
+      <div className="relative z-10 max-w-2xl mx-auto px-4">
+        {/* Navigation bar Header */}
+        <div className="flex items-center justify-between mb-4 border-b border-emerald-50 pb-4">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={handleRestart}>
+            <span className="text-2xl select-none">🌍</span>
+            <span className="font-heading font-black text-lg tracking-wide text-emerald-800">
+              EcoEvent
+            </span>
+          </div>
+          <span className="text-xs bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-bold">
+            Carbon Counter v1.2
+          </span>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {stage === "home" && (
+            <HomeScreen key="home" onStart={() => setStage("quiz")} />
+          )}
+          {stage === "quiz" && (
+            <EventQuestionCard
+              key={`q-${currentQ}`}
+              question={allQuestions[currentQ]}
+              questionIndex={currentQ}
+              totalQuestions={allQuestions.length}
+              onAnswer={handleAnswer}
+            />
+          )}
+          {stage === "result" && (
+            <ResultScreen
+              key="result"
+              organizerCO2={organizerCO2}
+              attendeeCO2={attendeeCO2}
+              role="both"
+              onRestart={handleRestart}
+              onShowToast={triggerToast}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Custom Global Toast Alert */}
+        <AnimatePresence>
+          {toastMessage && (
+            <Toast
+              message={toastMessage}
+              onClose={() => setToastMessage("")}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
